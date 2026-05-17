@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="description" content="GPS 실시간 속도 감지 및 CCTV 위치 기록 앱">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%23667eea' width='180' height='180' rx='40'/><text x='90' y='130' font-size='90' text-anchor='middle' fill='white' font-weight='bold'>🚗</text></svg>">
+    <title>🚗 운전자 안전 스피드 감지기</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 25px;
+            padding: 30px 25px;
+            box-shadow: 0 20px 70px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .status {
+            background: #f5f5f5;
+            border: 2px solid #ddd;
+            border-radius: 15px;
+            padding: 12px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #666;
+            text-align: center;
+        }
+
+        .status.active {
+            background: #e8f5e9;
+            border-color: #4caf50;
+            color: #2e7d32;
+        }
+
+        .speed-display {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 35px 15px;
+            color: white;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .speed-section, .time-section {
+            text-align: center;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .section-label {
+            font-size: 11px;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .speed-value {
+            font-size: 70px;
+            font-weight: bold;
+            margin-bottom: 2px;
+            line-height: 0.85;
+        }
+
+        .speed-unit {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+
+        .time-value {
+            font-size: 50px;
+            font-weight: bold;
+            margin-bottom: 2px;
+            line-height: 0.85;
+        }
+
+        .time-date {
+            font-size: 11px;
+            opacity: 0.85;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .tab-btn:hover {
+            border-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.show {
+            display: block;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 13px;
+        }
+
+        .btn-start {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-stop {
+            background: #f44336;
+            color: white;
+            display: none;
+        }
+
+        .btn-stop.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: inherit;
+        }
+
+        input[type="text"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .location-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .location-item {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .location-info {
+            flex: 1;
+            text-align: left;
+        }
+
+        .location-name {
+            font-weight: 600;
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .location-details {
+            font-size: 11px;
+            color: #999;
+            margin-bottom: 3px;
+        }
+
+        .location-speed {
+            font-size: 12px;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .location-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-delete {
+            background: #f44336;
+            color: white;
+            padding: 6px 12px;
+            font-size: 11px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .btn-save {
+            background: #667eea;
+            color: white;
+            padding: 8px 16px;
+            font-size: 13px;
+            width: 100%;
+        }
+
+        .coordinates-display {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 12px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 13px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .info-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            text-align: center;
+        }
+
+        .info-label {
+            font-size: 11px;
+            color: #999;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .warning.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="status" id="status" onclick="requestLocationPermission()" style="cursor: pointer;">
+        📍 위치 서비스 활성화 필요... (클릭하세요)
+    </div>
+
+    <div class="warning" id="warning">
+        ⚠️ 과속 경고! 안전하게 감속하세요.
+    </div>
+
+    <div class="speed-display">
+        <div class="speed-section">
+            <div class="section-label">현재 속도</div>
+            <div class="speed-value" id="speed">--</div>
+            <div class="speed-unit">km/h</div>
+        </div>
+        
+        <div class="time-section">
+            <div class="section-label">현재 시간</div>
+            <div class="time-value" id="currentTime">--:--</div>
+            <div class="time-date" id="currentDate">-</div>
+        </div>
+    </div>
+
+    <!-- 탭 메뉴 -->
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('dashboard')">🚗 운전</button>
+        <button class="tab-btn" onclick="switchTab('settings')">⚙️ 설정</button>
+    </div>
+
+    <!-- 운전 대시보드 탭 -->
+    <div class="tab-content show" id="dashboard">
+        <div class="controls">
+            <button class="btn-start" id="startBtn" onclick="startTracking()">🔴 추적 시작</button>
+            <button class="btn-stop" id="stopBtn" onclick="stopTracking()">⏹️ 중지</button>
+        </div>
+
+        <div class="info-grid">
+            <div class="info-card">
+                <div class="info-label">최고 속도</div>
+                <div class="info-value" id="maxSpeed">0</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">평균 속도</div>
+                <div class="info-value" id="avgSpeed">0</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">주행 거리</div>
+                <div class="info-value" id="distance">0km</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">주행 시간</div>
+                <div class="info-value" id="duration">0초</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 설정 탭 -->
+    <div class="tab-content" id="settings">
+        <h3 style="font-size: 14px; margin-bottom: 15px; color: #333;">📍 위치 기록</h3>
+
+        <div class="coordinates-display" id="coordsDisplay">
+            현재 좌표를 가져오는 중...
+        </div>
+
+        <div class="input-group">
+            <label for="locationName">위치명</label>
+            <input type="text" id="locationName" placeholder="예: 삼성역 앞 CCTV">
+        </div>
+
+        <div class="input-group">
+            <label for="speedLimit">제한 속도</label>
+            <select id="speedLimit">
+                <option value="">선택하세요</option>
+                <option value="50">50 km/h</option>
+                <option value="60">60 km/h</option>
+                <option value="80">80 km/h</option>
+                <option value="100">100 km/h</option>
+                <option value="120">120 km/h</option>
+            </select>
+        </div>
+
+        <button class="btn-save" onclick="saveLocation()">💾 이 위치 저장</button>
+
+        <h3 style="font-size: 14px; margin-top: 20px; margin-bottom: 12px; color: #333;">📌 저장된 위치</h3>
+
+        <div class="location-list" id="locationList">
+            <div class="empty-state">저장된 위치가 없습니다.</div>
+        </div>
+
+        <button onclick="exportData()" style="background: #2196F3; color: white; width: 100%; padding: 10px; margin-top: 15px; border-radius: 8px; border: none; cursor: pointer; font-size: 12px;">📤 데이터 내보내기</button>
+        <button onclick="deleteAllData()" style="background: #ff9800; color: white; width: 100%; padding: 10px; margin-top: 8px; border-radius: 8px; border: none; cursor: pointer; font-size: 12px;">🗑️ 모두 삭제</button>
+    </div>
+</div>
+
+<script>
+    let speedLimit = 100;
+    let watchId = null;
+    let speeds = [];
+    let distances = [];
+    let startTime = null;
+    let lastLat = null, lastLon = null;
+    let currentLat = null, currentLon = null;
+
+    // 탭 전환
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('show'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tab).classList.add('show');
+        event.target.classList.add('active');
+
+        if (tab === 'settings') {
+            loadLocations();
+        }
+    }
+
+    // 상태 업데이트
+    function updateStatus(text, type = 'normal') {
+        const status = document.getElementById('status');
+        status.textContent = text;
+        status.classList.remove('active');
+        if (type === 'active') status.classList.add('active');
+    }
+
+    // 현재 시간 업데이트
+    function updateTime() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const dateStr = now.toLocaleDateString('ko-KR', {
+            year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short'
+        });
+        
+        document.getElementById('currentTime').textContent = `${hours}:${minutes}:${seconds}`;
+        document.getElementById('currentDate').textContent = dateStr;
+    }
+
+    // 현재 좌표 업데이트
+    function updateCoordinates() {
+        const coordsDisplay = document.getElementById('coordsDisplay');
+        if (currentLat && currentLon) {
+            coordsDisplay.textContent = `📍 ${currentLat.toFixed(4)}, ${currentLon.toFixed(4)}`;
+        } else {
+            coordsDisplay.textContent = '현재 좌표를 가져오는 중...';
+        }
+    }
+
+    // 위치 저장
+    function saveLocation() {
+        const name = document.getElementById('locationName').value.trim();
+        const speed = document.getElementById('speedLimit').value;
+
+        if (!name) {
+            alert('위치명을 입력하세요');
+            return;
+        }
+        if (!speed) {
+            alert('제한 속도를 선택하세요');
+            return;
+        }
+        if (!currentLat || !currentLon) {
+            alert('현재 위치를 찾을 수 없습니다');
+            return;
+        }
+
+        const locations = JSON.parse(localStorage.getItem('locations') || '[]');
+        const newLocation = {
+            id: Date.now(),
+            name: name,
+            lat: currentLat,
+            lon: currentLon,
+            speed: speed,
+            savedTime: new Date().toLocaleString('ko-KR')
+        };
+
+        locations.push(newLocation);
+        localStorage.setItem('locations', JSON.stringify(locations));
+
+        document.getElementById('locationName').value = '';
+        document.getElementById('speedLimit').value = '';
+        updateStatus('✅ 위치가 저장되었습니다!', 'active');
+
+        loadLocations();
+    }
+
+    // 위치 로드
+    function loadLocations() {
+        const locations = JSON.parse(localStorage.getItem('locations') || '[]');
+        const listDiv = document.getElementById('locationList');
+
+        if (locations.length === 0) {
+            listDiv.innerHTML = '<div class="empty-state">저장된 위치가 없습니다.</div>';
+            return;
+        }
+
+        listDiv.innerHTML = locations.map(loc => `
+            <div class="location-item">
+                <div class="location-info">
+                    <div class="location-name">${loc.name}</div>
+                    <div class="location-details">${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}</div>
+                    <div class="location-speed">제한: ${loc.speed}km/h</div>
+                    <div class="location-details" style="margin-top: 3px;">${loc.savedTime}</div>
+                </div>
+                <div class="location-actions">
+                    <button class="btn-delete" onclick="deleteLocation(${loc.id})">삭제</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // 위치 삭제
+    function deleteLocation(id) {
+        if (confirm('이 위치를 삭제하시겠습니까?')) {
+            const locations = JSON.parse(localStorage.getItem('locations') || '[]');
+            const filtered = locations.filter(loc => loc.id !== id);
+            localStorage.setItem('locations', JSON.stringify(filtered));
+            loadLocations();
+        }
+    }
+
+    // 데이터 내보내기
+    function exportData() {
+        const locations = JSON.parse(localStorage.getItem('locations') || '[]');
+        const csv = '위치명,위도,경도,제한속도,저장시간\n' + 
+            locations.map(loc => `${loc.name},${loc.lat},${loc.lon},${loc.speed},${loc.savedTime}`).join('\n');
+        
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'cctv_locations.csv';
+        a.click();
+    }
+
+    // 모든 데이터 삭제
+    function deleteAllData() {
+        if (confirm('모든 저장된 위치를 삭제하시겠습니까?')) {
+            localStorage.removeItem('locations');
+            loadLocations();
+        }
+    }
+
+    // 추적 시작
+    function startTracking() {
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+
+        startBtn.style.display = 'none';
+        stopBtn.classList.add('show');
+
+        startTime = Date.now();
+        speeds = [];
+        distances = [];
+
+        if (!navigator.geolocation) {
+            updateStatus('❌ 위치 서비스 미지원', 'error');
+            return;
+        }
+
+        watchId = navigator.geolocation.watchPosition(
+            position => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                const speed = Math.round((position.coords.speed || 0) * 3.6);
+
+                currentLat = lat;
+                currentLon = lon;
+
+                updateStatus('✅ 추적 중...', 'active');
+                document.getElementById('speed').textContent = speed;
+                speeds.push(speed);
+
+                const maxSpeed = Math.max(...speeds, 0);
+                document.getElementById('maxSpeed').textContent = maxSpeed;
+
+                const avgSpeed = speeds.length > 0 ? Math.round(speeds.reduce((a, b) => a + b) / speeds.length) : 0;
+                document.getElementById('avgSpeed').textContent = avgSpeed;
+
+                if (lastLat && lastLon) {
+                    const distance = calculateDistance(lastLat, lastLon, lat, lon);
+                    distances.push(distance);
+                    const totalDistance = distances.reduce((a, b) => a + b, 0);
+                    document.getElementById('distance').textContent = totalDistance.toFixed(2) + 'km';
+                }
+
+                if (startTime) {
+                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                    document.getElementById('duration').textContent = formatTime(elapsed);
+                }
+
+                if (speed > speedLimit) {
+                    showWarning();
+                    playSound();
+                } else {
+                    hideWarning();
+                }
+
+                lastLat = lat;
+                lastLon = lon;
+            },
+            error => {
+                updateStatus('❌ 위치를 찾을 수 없습니다');
+            },
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+    }
+
+    // 추적 중지
+    function stopTracking() {
+        if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+        }
+
+        document.getElementById('startBtn').style.display = 'flex';
+        document.getElementById('stopBtn').classList.remove('show');
+        updateStatus('⏸️ 추적 중지됨');
+    }
+
+    // 거리 계산
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    // 시간 포맷
+    function formatTime(seconds) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        if (h > 0) return `${h}시간`;
+        if (m > 0) return `${m}분`;
+        return `${s}초`;
+    }
+
+    // 경고 표시
+    function showWarning() {
+        document.getElementById('warning').classList.add('show');
+    }
+
+    // 경고 숨기기
+    function hideWarning() {
+        document.getElementById('warning').classList.remove('show');
+    }
+
+    // 경고음
+    function playSound() {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            osc.frequency.value = 800;
+            gain.gain.setValueAtTime(0.2, audioContext.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            osc.start(audioContext.currentTime);
+            osc.stop(audioContext.currentTime + 0.1);
+        } catch (e) {}
+    }
+
+    // GPS 좌표 자동 업데이트
+    function updateGPSLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                currentLat = position.coords.latitude;
+                currentLon = position.coords.longitude;
+                updateCoordinates();
+                updateStatus('✅ 위치 서비스 활성화됨!', 'active');
+            }, error => {
+                updateCoordinates();
+            });
+        }
+    }
+
+    // 위치 권한 요청 (클릭 시)
+    function requestLocationPermission() {
+        if (!navigator.geolocation) {
+            alert('이 기기는 위치 서비스를 지원하지 않습니다.');
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                currentLat = position.coords.latitude;
+                currentLon = position.coords.longitude;
+                updateCoordinates();
+                updateStatus('✅ 위치 서비스 활성화됨!', 'active');
+            },
+            error => {
+                if (error.code === error.PERMISSION_DENIED) {
+                    updateStatus('❌ 위치 권한이 거부되었습니다. 설정에서 허용해주세요.', 'error');
+                } else if (error.code === error.TIMEOUT) {
+                    updateStatus('⏱️ 위치 찾기 시간 초과. 다시 시도하세요.', 'error');
+                } else {
+                    updateStatus('❌ 위치를 찾을 수 없습니다.', 'error');
+                }
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    }
+
+    // Service Worker 등록
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('service-worker.js')
+            .then(reg => console.log('Service Worker 등록 성공'))
+            .catch(err => console.log('Service Worker 등록 실패:', err));
+    }
+
+    // 초기화
+    updateTime();
+    setInterval(updateTime, 1000);
+</script>
+
+</body>
+</html>
